@@ -102,7 +102,7 @@ def w7x_mds_virtual_names(data_name, exp_id, channel_config_file):
         _data_name = data_name
     select_list = []
     select_mds_list = []
-    for i,dn in enumerate(data_name):    
+    for i,dn in enumerate(_data_name):    
         try:
             sl, si = flap.select_signals(entry_names, dn)
             select_list += sl
@@ -210,7 +210,7 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
         for mds_name in mds_request_list:
             mds_name_split = mds_name.split('::')
             if (len(mds_name_split) is not 2):
-                raise ValueError("Invalid mds name 'mds_name', missing tree name? Data name is tree::node")
+                raise ValueError("Invalid mds name '{:s}', missing tree name? Data name is tree::node".format(mds_name))
             tree_name = mds_name_split[0].strip()
             if (tree_name[0] == '\\'):
                 tree_name = tree_name[1:]
@@ -256,9 +256,9 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
                     print("Reading "+mds_name)
                 try:
                     mdsdata = conn.get(mds_name)
-                    mdsdata_start = mdsdata.dim_of().begin
-                    mdsdata_step = mdsdata.dim_of().delta
-                    mdsdata_end = mdsdata.dim_of().ending
+                    mdsdata_start = mdsdata.dim_of()._fields['begin']
+                    mdsdata_step = mdsdata.dim_of()._fields['delta']
+                    mdsdata_end = mdsdata.dim_of()._fields['ending']
                     mdsdata = mdsdata.data()               
                 except MDSplus.MDSplusException as e:
                     raise RuntimeError("Cannot read MDS node:{:s}".format(mds_name))
@@ -287,14 +287,14 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
                         print("Warning: Cannot write cache file: "+filename)
                     break
                                         
-                if (time_start is not None):
-                    if ((mdsdata_start != time_start) or (mdsdata_step != time_step)
-                        or (mdsdata_end != time_end)):
-                        raise ValueError("Different timescales for signals. Not possible to return in one flap.DataObject.")
-                else:
-                    time_start = mdsdata_start
-                    time_step = mdsdata_step
-                    time_end = mdsdata_end
+            if (time_start is not None):
+                if ((mdsdata_start != time_start) or (mdsdata_step != time_step)
+                    or (mdsdata_end != time_end)):
+                    raise ValueError("Different timescales for signals. Not possible to return in one flap.DataObject.")
+            else:
+                time_start = mdsdata_start
+                time_step = mdsdata_step
+                time_end = mdsdata_end
             this_data_list.append(mdsdata) 
         if (readtype == 0):
             data_list.append(this_data_list[0])
@@ -307,31 +307,36 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
                 dtype = float
         if (data_list[i].dtype.kind == 'c'):
             dtype = complex
-    data = np.empty((len(data_list),len(data_list[0])),dtype=dtype)
-    for i in range(len(data_list)):
-        data[i,:] = data_list[i].astype(dtype)
-    
-    coord = [None] * 3
-    coord[0] = copy.deepcopy(flap.Coordinate(name='Time',
-                                             unit='Second',
-                                             mode=flap.CoordinateMode(equidistant=True),
-                                             start=time_start,
-                                             step=time_step,
-                                             dimension_list=[1])
-                             )
-    coord[1] = copy.deepcopy(flap.Coordinate(name='Sample',
-                                             unit='',
-                                             mode=flap.CoordinateMode(equidistant=True),
-                                             start=0,
-                                             step=1,
-                                             dimension_list=[1])
-                             )
-    coord[2] = copy.deepcopy(flap.Coordinate(name='Signal name',
-                                             unit='',
-                                             mode=flap.CoordinateMode(equidistant=False),
-                                             values=signal_list,
-                                             dimension_list=[0])
-                             )
+    if (len(data_list) == 1):
+        data = data_list[0]
+        signal_dim = []
+    else:    
+        data = np.empty((len(data_list[0]),len(data_list)),dtype=dtype)
+        for i in range(len(data_list)):
+            data[:,i] = data_list[i].astype(dtype)
+        signal_dim = [1]
+    coord = []
+    if ((time_start is not None) and (time_step is not None)):
+        coord.append(copy.deepcopy(flap.Coordinate(name='Time',
+                                                   unit='Second',
+                                                   mode=flap.CoordinateMode(equidistant=True),
+                                                   start=time_start,
+                                                   step=time_step,
+                                                   dimension_list=[0])
+                                    ))
+    coord.append(copy.deepcopy(flap.Coordinate(name='Sample',
+                                               unit='',
+                                               mode=flap.CoordinateMode(equidistant=True),
+                                               start=0,
+                                               step=1,
+                                               dimension_list=[0])
+                               ))
+    coord.append(copy.deepcopy(flap.Coordinate(name='Signal name',
+                                               unit='',
+                                               mode=flap.CoordinateMode(equidistant=False),
+                                               values=signal_list,
+                                               dimension_list=signal_dim)
+                                 ))
 
     data_title = "W7-X MDSPlus data"
     d = flap.DataObject(data_array=data,
