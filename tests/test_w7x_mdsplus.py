@@ -54,20 +54,21 @@ def test_mdsplus():
                         )    
     except Exception as e:
         raise e
-    d1.plot(axes='Sample')
+    d1.plot(axes='Time')
     
-    print("**** Reading a complex virtual signal")
+    print("**** Reading multiple complex virtual signals in part of the time.")
     try:
         # Explicit MDSPlus reference
         d2=flap.get_data('W7X_MDSPlus',
-                        name='CR-D',
+                        name=['CR-B','CR-C','CR-D','CR-E'],
                         exp_id='20181018.003',
-                        object_name="CR-D"
+                       coordinates={'Time':[4,4.1]},
+                        object_name="CR"
                         )    
     except Exception as e:
         raise e
     plt.figure()
-    d2.plot(axes='Time')
+    d2.abs().plot(axes='Time',options={'All':True})
     flap.list_data_objects()
    
 # Reading configuration file in the test directory

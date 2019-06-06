@@ -14,6 +14,7 @@ import fnmatch
 import io
 import pickle
 import os
+import math
 
 import MDSplus
 
@@ -177,15 +178,29 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
             virt_names, virt_mds = w7x_mds_virtual_names(data_name, exp_id, _options['Virtual name file'])
         except Exception as e:
             raise e
-    
+
+    read_range = None
+    read_samplerange = None
+    if (coordinates is not None):
+        if (type(coordinates) is not list):
+            _coordinates = [coordinates]
+        else:
+            _coordinates = coordinates
+        for coord in _coordinates:
+            if (type(coord) is not flap.Coordinate):
+                raise TypeError("Coordinate description should be flap.Coordinate.")
+            if (coord.unit.name is 'Time'):
+                if (coord.mode.equidistant):
+                    read_range = [float(coord.c_range[0]),float(coord.c_range[1])]
+                else:
+                    raise NotImplementedError("Non-equidistant Time axis is not implemented yet.")
+                break
+
     connection_name = 'ssh://' + _options['User'] + '@' + _options['Server']
     
     signal_list = []
     data_list = []
-    time_start = None
-    time_step = None
-    time_end = None
-    
+    common_time = None    
     for name, mds_descr in zip(virt_names,virt_mds):
         # Assembling a list of MDS nodes needed for this data
         mds_request_list = []
@@ -227,9 +242,8 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
                     try:
                         if (mdsdata_pickle['MDSdata cache']):
                             mdsdata = mdsdata_pickle['Data']
-                            mdsdata_start = mdsdata_pickle['Start']
-                            mdsdata_end = mdsdata_pickle['End']
-                            mdsdata_step = mdsdata_pickle['Step']
+                            mdsdata_time = mdsdata_pickle['Time']
+                            mdsdata_time_unit = mdsdata_pickle['Time unit']
                             del mdsdata_pickle
                             data_cached = True
                     except:
@@ -255,11 +269,9 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
                 if (_options['Verbose']):
                     print("Reading "+mds_name)
                 try:
-                    mdsdata = conn.get(mds_name)
-                    mdsdata_start = mdsdata.dim_of()._fields['begin']
-                    mdsdata_step = mdsdata.dim_of()._fields['delta']
-                    mdsdata_end = mdsdata.dim_of()._fields['ending']
-                    mdsdata = mdsdata.data()               
+                    mdsdata = conn.get(mds_name).data()
+                    mdsdata_time = conn.get('dim_of('+mds_name+')').data()
+                    mdsdata_time_unit = 1e-9
                 except MDSplus.MDSplusException as e:
                     raise RuntimeError("Cannot read MDS node:{:s}".format(mds_name))
             if (not data_cached and (_options['Cache data']) and (_options['Cache directory'] is not None)):
@@ -272,9 +284,8 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
                     mdsdata_pickle = {}
                     mdsdata_pickle['MDSdata cache'] = True
                     mdsdata_pickle['Data'] = copy.deepcopy(mdsdata)
-                    mdsdata_pickle['Start'] = mdsdata_start
-                    mdsdata_pickle['End'] = mdsdata_end
-                    mdsdata_pickle['Step'] = mdsdata_step
+                    mdsdata_pickle['Time'] = mdsdata_time
+                    mdsdata_pickle['Time unit'] = mdsdata_time_unit
                     try:
                         pickle.dump(mdsdata_pickle,f)
                         del mdsdata_pickle
@@ -286,16 +297,29 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
                     except Exception as e:
                         print("Warning: Cannot write cache file: "+filename)
                     break
-                                        
-            if (time_start is not None):
-                if ((mdsdata_start != time_start) or (mdsdata_step != time_step)
-                    or (mdsdata_end != time_end)):
+                          
+            if (read_range is not None):
+                read_ind = np.nonzero(np.logical_and(mdsdata_time * mdsdata_time_unit >= read_range[0],
+                                                     mdsdata_time * mdsdata_time_unit <= read_range[1]
+                                                     )
+                                      )[0]
+                mdsdata_time = mdsdata_time[read_ind]
+                mdsdata = mdsdata[read_ind]
+            else:
+                read_ind = [0, len(mdsdata)]
+                
+            if (common_time is not None):
+                if ((len(common_time) != len(mdsdata_time) or \
+                    (math.fabs(common_time_unit - mdsdata_time_unit)) / common_time_unit > 0.001) or \
+                    (np.nonzero(np.abs(common_time - mdsdata_time) \
+                        > math.fabs(common_time[1] - common_time[0]) * 0.1)[0].size != 0)):
                     raise ValueError("Different timescales for signals. Not possible to return in one flap.DataObject.")
             else:
-                time_start = mdsdata_start
-                time_step = mdsdata_step
-                time_end = mdsdata_end
-            this_data_list.append(mdsdata) 
+                common_time = mdsdata_time
+                common_time_unit = mdsdata_time_unit
+            
+            this_data_list.append(mdsdata)
+            del mdsdata
         if (readtype == 0):
             data_list.append(this_data_list[0])
         elif (readtype == 1):
@@ -315,23 +339,42 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
         for i in range(len(data_list)):
             data[:,i] = data_list[i].astype(dtype)
         signal_dim = [1]
+        
+            
+    dt = (common_time[1:] - common_time[:-1])
+    if (np.nonzero(np.abs(dt - dt[0]) / dt[0] > 0.01)[0].size != 0):
+        coord_type = flap.CoordinateMode(equidistant=False)
+    else:
+        coord_type = flap.CoordinateMode(equidistant=True)
+    
     coord = []
-    if ((time_start is not None) and (time_step is not None)):
+    if (coord_type.equidistant):
         coord.append(copy.deepcopy(flap.Coordinate(name='Time',
                                                    unit='Second',
-                                                   mode=flap.CoordinateMode(equidistant=True),
-                                                   start=time_start,
-                                                   step=time_step,
+                                                   mode=coord_type,
+                                                   shape = [],
+                                                   start=common_time[0] * common_time_unit,
+                                                   step=(common_time[1] - common_time[0]) * common_time_unit,
                                                    dimension_list=[0])
                                     ))
+    else:
+        coord.append(copy.deepcopy(flap.Coordinate(name='Time',
+                                                   unit='Second',
+                                                   mode=coord_type,
+                                                   values=common_time * common_time_unit,
+                                                   shape = common_time.shape,
+                                                   dimension_list=[0])
+                                    ))
+        
     coord.append(copy.deepcopy(flap.Coordinate(name='Sample',
                                                unit='',
                                                mode=flap.CoordinateMode(equidistant=True),
-                                               start=0,
+                                               start=read_ind[0],
                                                step=1,
                                                dimension_list=[0])
                                ))
     coord.append(copy.deepcopy(flap.Coordinate(name='Signal name',
+                                               shape=tuple([len(signal_list)]),
                                                unit='',
                                                mode=flap.CoordinateMode(equidistant=False),
                                                values=signal_list,
