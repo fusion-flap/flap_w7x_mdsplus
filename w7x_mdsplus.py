@@ -36,8 +36,9 @@ def w7x_mds_virtual_names(data_name, exp_id, channel_config_file):
         from the two MDS+ entries.
     Wildcards are allowed in data names. Data names can be a single string or list of strings.
     Return value:
-        virt_names, mds_names
+        virt_names, mds_str, mds_names
         virt names is a list of the interpreted names.
+        mds_str is the MDSPlus description from the virtual name translation file
         mds_names is a list of the same length as virt_names. Elements can be the following:
             string: a single MDS+ name
             list: [<type>, <mds1>, <mds2>, ...]
@@ -124,7 +125,7 @@ def w7x_mds_virtual_names(data_name, exp_id, channel_config_file):
             mds_descr.append([mds_type] + mds_list)
         else:
             mds_descr.append(descr)    
-    return select_list, mds_descr        
+    return select_list, select_mds_list, mds_descr        
 
 def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=None, coordinates=None):
     """ Data read function for the W7-X MDSPlus database
@@ -175,7 +176,7 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
         raise ValueError("data_name should be a string or list of strings.")
     if (_options['Virtual name file'] is not None):
         try:
-            virt_names, virt_mds = w7x_mds_virtual_names(data_name, exp_id, _options['Virtual name file'])
+            virt_names, virt_mds_txt, virt_mds = w7x_mds_virtual_names(data_name, exp_id, _options['Virtual name file'])
         except Exception as e:
             raise e
 
@@ -223,6 +224,7 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
         # Reading the required nodes
         this_data_list = []
         for mds_name in mds_request_list:
+            print(mds_name)
             mds_name_split = mds_name.split('::')
             if (len(mds_name_split) is not 2):
                 raise ValueError("Invalid mds name '{:s}', missing tree name? Data name is tree::node".format(mds_name))
@@ -378,6 +380,13 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
                                                unit='',
                                                mode=flap.CoordinateMode(equidistant=False),
                                                values=signal_list,
+                                               dimension_list=signal_dim)
+                                 ))
+    coord.append(copy.deepcopy(flap.Coordinate(name='MDSPlus descripton',
+                                               shape=tuple([len(virt_mds_txt)]),
+                                               unit='',
+                                               mode=flap.CoordinateMode(equidistant=False),
+                                               values=virt_mds_txt,
                                                dimension_list=signal_dim)
                                  ))
 

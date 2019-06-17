@@ -68,7 +68,7 @@ def test_mdsplus():
     except Exception as e:
         raise e
     plt.figure()
-    d2.abs().plot(axes='Time',options={'All':True})
+    d2.abs_value().plot(axes='Time',options={'All':True})
     flap.list_data_objects()
    
 # Reading configuration file in the test directory
