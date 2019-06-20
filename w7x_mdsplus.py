@@ -15,6 +15,7 @@ import io
 import pickle
 import os
 import math
+import matplotlib.pyplot as plt
 
 import MDSplus
 
@@ -224,7 +225,6 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
         # Reading the required nodes
         this_data_list = []
         for mds_name in mds_request_list:
-            print(mds_name)
             mds_name_split = mds_name.split('::')
             if (len(mds_name_split) is not 2):
                 raise ValueError("Invalid mds name '{:s}', missing tree name? Data name is tree::node".format(mds_name))
@@ -274,6 +274,16 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
                     mdsdata = conn.get(mds_name).data()
                     mdsdata_time = conn.get('dim_of('+mds_name+')').data()
                     mdsdata_time_unit = 1e-9
+#                    t = mdsdata_time*mdsdata_time_unit
+#                    ind = np.nonzero(np.logical_and(t > 4.4,t < 4.8))[0]
+#                    try:
+#                        figcount
+#                        figcount += 1
+#                    except NameError:
+#                        figcount = 1
+#                    plt.figure(figcount)
+#                    plt.plot(t[ind],mdsdata[ind])
+#                    plt.title(mds_name)
                 except MDSplus.MDSplusException as e:
                     raise RuntimeError("Cannot read MDS node:{:s}".format(mds_name))
             if (not data_cached and (_options['Cache data']) and (_options['Cache directory'] is not None)):
@@ -380,6 +390,13 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
                                                unit='',
                                                mode=flap.CoordinateMode(equidistant=False),
                                                values=signal_list,
+                                               dimension_list=signal_dim)
+                                 ))
+    coord.append(copy.deepcopy(flap.Coordinate(name='Channel',
+                                               shape=tuple([len(signal_list)]),
+                                               unit='',
+                                               mode=flap.CoordinateMode(equidistant=False),
+                                               values=np.arange(len(signal_list)) + 1,
                                                dimension_list=signal_dim)
                                  ))
     coord.append(copy.deepcopy(flap.Coordinate(name='MDSPlus descripton',
