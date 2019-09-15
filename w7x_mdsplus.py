@@ -68,10 +68,11 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
     exp_id_mds = int(exp_id_split[0][2:] + exp_id_split[1])
     
     try:
-        d = flap.get_data('MDSPlus',exp_id=exp_id_mds,data_name=name,no_data=no_data,options=options,coordinates=coordinates)
+        d = flap.get_data('MDSPlus',exp_id=exp_id_mds,name=data_name,no_data=no_data,options=_options,coordinates=coordinates)
         d.data_title = 'W7X_MDSPlus data'
     except Exception as e:
         raise e
+    return d
 
 def add_coordinate(data_object, new_coordinates, options=None):
     raise NotImplementedError("Coordinate conversions not implemented yet.")

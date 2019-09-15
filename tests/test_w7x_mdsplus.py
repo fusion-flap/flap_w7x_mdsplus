@@ -77,3 +77,7 @@ fn = os.path.join(thisdir,"test_w7x_mdsplus.cfg")
 flap.config.read(file_name=fn)
         
 test_mdsplus()
+d=0
+
+d.plot(axes='Time')
+flap.plot('TEST_MDS',axes='Time')
