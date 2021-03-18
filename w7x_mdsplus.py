@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 
 import flap
 import flap_mdsplus
-flap_mdsplus.register()
+#flap_mdsplus.register()
 
 
 def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=None, coordinates=None, data_source=None):

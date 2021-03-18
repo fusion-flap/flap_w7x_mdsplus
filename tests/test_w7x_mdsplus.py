@@ -26,9 +26,12 @@ import matplotlib.pyplot as plt
 import os
 
 import flap
+import flap_mdsplus
 import flap_w7x_mdsplus
 
+flap_mdsplus.register()
 flap_w7x_mdsplus.register()
+
 
 def test_mdsplus(): 
     plt.close('all')
