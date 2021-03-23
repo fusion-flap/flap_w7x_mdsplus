@@ -68,7 +68,9 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
     exp_id_mds = int(exp_id_split[0][2:] + exp_id_split[1])
     
     try:
-        d = flap.get_data('MDSPlus',exp_id=exp_id_mds,name=data_name,no_data=no_data,options=_options,coordinates=coordinates)
+        mds_options = _options
+        mds_options['MDS time unit'] = 'ns'
+        d = flap.get_data('MDSPlus',exp_id=exp_id_mds,name=data_name,no_data=no_data,options=mds_options,coordinates=coordinates)
         d.data_title = 'W7X_MDSPlus data'
     except Exception as e:
         raise e
