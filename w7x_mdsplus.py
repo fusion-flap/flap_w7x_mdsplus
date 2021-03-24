@@ -54,7 +54,8 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
                        'Virtual name file': None,
                        'Verbose': True,
                        'Cache data': False,
-                       'Cache directory': None
+                       'Cache directory': None,
+                       'MDS time unit':'ns'
                        }
     _options = flap.config.merge_options(default_options,options,data_source=data_source)
 
@@ -69,7 +70,6 @@ def w7x_mdsplus_get_data(exp_id=None, data_name=None, no_data=False, options=Non
     
     try:
         mds_options = _options
-        mds_options['MDS time unit'] = 'ns'
         d = flap.get_data('MDSPlus',exp_id=exp_id_mds,name=data_name,no_data=no_data,options=mds_options,coordinates=coordinates)
         d.data_title = 'W7X_MDSPlus data'
     except Exception as e:
